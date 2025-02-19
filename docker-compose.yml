@@ -1,0 +1,62 @@
+# Defines the custom network used by all services in this stack
+networks:
+  monitoring:
+     driver: bridge  # Uses a bridge network to allow containers to communicate
+
+# Defines the volumes for persistent data storage
+volumes:
+  prometheus_data:
+    name: prometheus_data  # Defines a named volume for Prometheus data
+  grafana_data:
+    name: grafana_data  # Defines a named volume for Grafana data
+
+services: 
+  prometheus:
+    image: prom/prometheus:latest  # Specifies the Docker image for Prometheus
+    container_name: ${PROMETHEUS_CONTAINER}  # Container name taken from .env file
+    restart: always  # Ensures the container always restarts if it crashes
+    env_file: .env  # Loads environment variables from the .env file
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml  # Mounts the local Prometheus configuration file into the container
+      - prometheus_data:/prometheus  # (Optional) Mounts a volume for persistent Prometheus data storage
+    expose:
+      - ${PROMETHEUS_PORT}  # Exposes the Prometheus port defined in .env file
+    ports:
+      - ${PROMETHEUS_PORT}:${PROMETHEUS_PORT}  # Maps the Prometheus port from the container to the host
+    networks:
+      - monitoring  # Connects Prometheus to the "monitoring" network
+    depends_on:
+      - node-exporter  # Ensures Node Exporter starts before Prometheus
+
+  # Service definition for Node Exporter (collects system metrics)
+  node-exporter:
+    image: prom/node-exporter:latest  # Specifies the Docker image for Node Exporter
+    container_name: ${NODE_EXPORTER_CONTAINER}  # Container name taken from .env file
+    restart: always  # Ensures the container always restarts if it crashes
+    env_file: .env  # Loads environment variables from the .env file
+    volumes:
+      - /proc:/host/proc:ro  # Mounts the /proc directory from the host into the container (read-only)
+      - /sys:/host/sys:ro  # Mounts the /sys directory from the host into the container (read-only)
+      - /:/rootfs:ro  # Mounts the root filesystem of the host into the container (read-only)
+    expose:
+      - ${NODE_EXPORTER_PORT}  # Exposes the Node Exporter port defined in .env file
+    networks:
+      - monitoring  # Connects Node Exporter to the "monitoring" network
+  
+    # Service definition for Grafana (visualizes the metrics collected by Prometheus)
+  grafana:
+    image: grafana/grafana  # Specifies the Docker image for Grafana
+    container_name: ${GRAFANA_CONTAINER}  # Container name taken from .env file
+    restart: always  # Ensures the container always restarts if it crashes
+    ports:
+      - ${GRAFANA_PORT}:${GRAFANA_PORT}  # Maps the Grafana port from the container to the host
+    env_file: .env  # Loads environment variables from the .env file
+    volumes:
+      - ./config/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml  # Mounts the Grafana data source configuration file
+      - ./config/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml  # Mounts the Grafana dashboard configuration file
+      - ./config/dashboard.json:/var/lib/grafana/dashboards/dashboard.json  # Mounts a Grafana dashboard definition file
+      # - grafana_data:/var/lib/grafana  # (Optional) Mounts a volume for persistent Grafana data storage
+    networks:
+      - monitoring  # Connects Grafana to the "monitoring" network
+    depends_on:
+      - prometheus  # Ensures Prometheus starts before Grafana

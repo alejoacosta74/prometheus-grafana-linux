@@ -34,10 +34,17 @@ services:
     container_name: ${NODE_EXPORTER_CONTAINER}  # Container name taken from .env file
     restart: always  # Ensures the container always restarts if it crashes
     env_file: .env  # Loads environment variables from the .env file
+    command:
+      # Tells Node Exporter where the host's root filesystem is mounted inside the container
+      - '--path.rootfs=/rootfs' 
+      # Excludes virtual filesystems and special mounts that we don't want to monitor
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)|^/rootfs/.*'
+      # Excludes non-relevant filesystem types
+      - '--collector.filesystem.fs-types-exclude=^(tempfs|nsfs|autofs|binfmt_misc|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$' 
     volumes:
+      - /:/rootfs:ro  # Mounts the root filesystem of the host into the container (read-only)
       - /proc:/host/proc:ro  # Mounts the /proc directory from the host into the container (read-only)
       - /sys:/host/sys:ro  # Mounts the /sys directory from the host into the container (read-only)
-      - /:/rootfs:ro  # Mounts the root filesystem of the host into the container (read-only)
     expose:
       - ${NODE_EXPORTER_PORT}  # Exposes the Node Exporter port defined in .env file
     networks:
